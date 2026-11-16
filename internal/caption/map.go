@@ -1,0 +1,50 @@
+package caption
+
+import (
+	"cadenceforge/internal/domain"
+	"fmt"
+	"html"
+	"sort"
+	"strings"
+)
+
+type Interval struct {
+	StartMS, EndMS int64
+	Text           string
+	Order          int
+}
+
+func Map(sheet domain.Sheet, plan domain.Plan) []Interval {
+	out := []Interval{}
+	for _, p := range plan.Placements {
+		for i, c := range sheet.Cues {
+			if c.SourceID != p.SourceID {
+				continue
+			}
+			start := max(c.StartMS, p.SourceInMS)
+			end := min(c.EndMS, p.SourceOutMS)
+			if end <= start {
+				continue
+			}
+			out = append(out, Interval{StartMS: p.OutputInMS + start - p.SourceInMS, EndMS: p.OutputInMS + end - p.SourceInMS, Text: c.Text, Order: i})
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].StartMS != out[j].StartMS {
+			return out[i].StartMS < out[j].StartMS
+		}
+		return out[i].Order < out[j].Order
+	})
+	return out
+}
+func stamp(ms int64) string {
+	return fmt.Sprintf("%02d:%02d:%02d.%03d", ms/3600000, (ms/60000)%60, (ms/1000)%60, ms%1000)
+}
+func VTT(intervals []Interval) string {
+	var b strings.Builder
+	b.WriteString("WEBVTT\n\n")
+	for i, c := range intervals {
+		fmt.Fprintf(&b, "%d\n%s --> %s\n%s\n\n", i+1, stamp(c.StartMS), stamp(c.EndMS), strings.ReplaceAll(html.EscapeString(c.Text), "\n\n", "\n"))
+	}
+	return b.String()
+}

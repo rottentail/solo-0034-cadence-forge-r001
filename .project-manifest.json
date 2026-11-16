@@ -1,0 +1,453 @@
+{
+  "project_name": "solo-0034-cadence-forge",
+  "project_shape": "backend",
+  "modules": [
+    {
+      "id": "http",
+      "name": "HTTP协议与错误响应",
+      "path": "internal/transport"
+    },
+    {
+      "id": "application",
+      "name": "领域工作流协调与冻结提交",
+      "path": "internal/service"
+    },
+    {
+      "id": "domain",
+      "name": "媒体契约、版本与状态不变量",
+      "path": "internal/domain"
+    },
+    {
+      "id": "journal",
+      "name": "耐久状态、单实例锁与恢复",
+      "path": "internal/journal"
+    },
+    {
+      "id": "objects",
+      "name": "内容寻址接收与产物提升",
+      "path": "internal/blob"
+    },
+    {
+      "id": "media",
+      "name": "探测、声音测量及审片图像",
+      "path": "internal/media"
+    },
+    {
+      "id": "timeline",
+      "name": "源区间与成片区间关系",
+      "path": "internal/timeline"
+    },
+    {
+      "id": "captions",
+      "name": "源字幕到成片字幕映射",
+      "path": "internal/caption"
+    },
+    {
+      "id": "encoding",
+      "name": "滤镜图与媒体进程执行",
+      "path": "internal/encoding"
+    },
+    {
+      "id": "inspection",
+      "name": "成片契约与完整性核验",
+      "path": "internal/inspect"
+    },
+    {
+      "id": "configuration",
+      "name": "部署参数与执行资源",
+      "path": "internal/config"
+    }
+  ],
+  "workflows": [
+    {
+      "id": "ingest",
+      "name": "ingest",
+      "entry": "POST /forge/v1/sources",
+      "success": "素材ID、SHA-256及流事实",
+      "failure": "不可解析媒体拒绝且无领域素材登记",
+      "steps": [
+        "入口解码与领域事实读取",
+        "只有完成探测的完整对象可被剪辑引用",
+        "素材ID、SHA-256及流事实"
+      ],
+      "module_ids": [
+        "http",
+        "application",
+        "objects",
+        "media",
+        "domain",
+        "journal"
+      ],
+      "verification": "python3 scripts/workflow_check.py --workflow ingest"
+    },
+    {
+      "id": "recipe-version",
+      "name": "recipe-version",
+      "entry": "POST/PUT /forge/v1/recipes",
+      "success": "新修订与ETag",
+      "failure": "过期If-Match返回409",
+      "steps": [
+        "入口解码与领域事实读取",
+        "历史配方不可变且过期写入不可覆盖",
+        "新修订与ETag"
+      ],
+      "module_ids": [
+        "http",
+        "application",
+        "domain",
+        "journal"
+      ],
+      "verification": "python3 scripts/workflow_check.py --workflow recipe-version"
+    },
+    {
+      "id": "sheet-version",
+      "name": "sheet-version",
+      "entry": "POST/PUT /forge/v1/sheets",
+      "success": "新剪辑修订",
+      "failure": "非法区间拒绝、过期写入409",
+      "steps": [
+        "入口解码与领域事实读取",
+        "剪辑引用有效且历史修订不被覆盖",
+        "新剪辑修订"
+      ],
+      "module_ids": [
+        "http",
+        "application",
+        "domain",
+        "journal"
+      ],
+      "verification": "python3 scripts/workflow_check.py --workflow sheet-version"
+    },
+    {
+      "id": "preview",
+      "name": "preview",
+      "entry": "GET /forge/v1/sheets/{id}/preview",
+      "success": "区间计划及字幕",
+      "failure": "配方与素材流不兼容时拒绝",
+      "steps": [
+        "入口解码与领域事实读取",
+        "同一快照内的源区间产生一致成片时间",
+        "区间计划及字幕"
+      ],
+      "module_ids": [
+        "http",
+        "application",
+        "timeline",
+        "captions",
+        "domain",
+        "journal"
+      ],
+      "verification": "python3 scripts/workflow_check.py --workflow preview"
+    },
+    {
+      "id": "captions",
+      "name": "captions",
+      "entry": "GET /forge/v1/sheets/{id}/preview",
+      "success": "WebVTT及成片区间",
+      "failure": "非法字幕保存被拒",
+      "steps": [
+        "入口解码与领域事实读取",
+        "重复源出现各自映射、区间求交且文本转义",
+        "WebVTT及成片区间"
+      ],
+      "module_ids": [
+        "http",
+        "application",
+        "timeline",
+        "captions",
+        "domain"
+      ],
+      "verification": "python3 scripts/workflow_check.py --workflow captions"
+    },
+    {
+      "id": "loudness",
+      "name": "loudness",
+      "entry": "POST /forge/v1/sources/{id}/loudness",
+      "success": "LUFS、真峰值及静音指示",
+      "failure": "无音频或完整性变化拒绝",
+      "steps": [
+        "入口解码与领域事实读取",
+        "声音分析绑定确切源字节而静音不伪装数值",
+        "LUFS、真峰值及静音指示"
+      ],
+      "module_ids": [
+        "http",
+        "application",
+        "objects",
+        "media",
+        "inspection"
+      ],
+      "verification": "python3 scripts/workflow_check.py --workflow loudness"
+    },
+    {
+      "id": "storyboard",
+      "name": "storyboard",
+      "entry": "GET /forge/v1/sources/{id}/visual?mode=storyboard",
+      "success": "四格PNG",
+      "failure": "无视频拒绝",
+      "steps": [
+        "入口解码与领域事实读取",
+        "审片图像仅依据已核验源、输出大小有界",
+        "四格PNG"
+      ],
+      "module_ids": [
+        "http",
+        "application",
+        "media",
+        "inspection",
+        "objects"
+      ],
+      "verification": "python3 scripts/workflow_check.py --workflow storyboard"
+    },
+    {
+      "id": "waveform",
+      "name": "waveform",
+      "entry": "GET /forge/v1/sources/{id}/visual?mode=waveform",
+      "success": "640x120 PNG",
+      "failure": "无音频拒绝",
+      "steps": [
+        "入口解码与领域事实读取",
+        "波形依据已核验源且不改变源内容",
+        "640x120 PNG"
+      ],
+      "module_ids": [
+        "http",
+        "application",
+        "media",
+        "inspection",
+        "objects"
+      ],
+      "verification": "python3 scripts/workflow_check.py --workflow waveform"
+    },
+    {
+      "id": "mp4-render",
+      "name": "mp4-render",
+      "entry": "POST /forge/v1/renders",
+      "success": "H.264/AAC成片及检验事实",
+      "failure": "加工或检验失败留下失败尝试",
+      "steps": [
+        "入口解码与领域事实读取",
+        "只有匹配冻结计划且检验通过的音画可交付",
+        "H.264/AAC成片及检验事实"
+      ],
+      "module_ids": [
+        "http",
+        "application",
+        "timeline",
+        "captions",
+        "encoding",
+        "inspection",
+        "objects",
+        "journal"
+      ],
+      "verification": "python3 scripts/workflow_check.py --workflow mp4-render"
+    },
+    {
+      "id": "wav-render",
+      "name": "wav-render",
+      "entry": "POST /forge/v1/renders",
+      "success": "双声道PCM WAV",
+      "failure": "来源无声音轨时拒绝",
+      "steps": [
+        "入口解码与领域事实读取",
+        "声音加工保持源区间和配方的冻结时间关系",
+        "双声道PCM WAV"
+      ],
+      "module_ids": [
+        "http",
+        "application",
+        "timeline",
+        "encoding",
+        "inspection",
+        "objects",
+        "journal"
+      ],
+      "verification": "python3 scripts/workflow_check.py --workflow wav-render"
+    },
+    {
+      "id": "idempotent-submit",
+      "name": "idempotent-submit",
+      "entry": "POST /forge/v1/renders + Idempotency-Key",
+      "success": "202任务快照",
+      "failure": "同键不同输入409、容量429",
+      "steps": [
+        "入口解码与领域事实读取",
+        "同键同输入汇合同任务、容量与冻结同次决策",
+        "202任务快照"
+      ],
+      "module_ids": [
+        "http",
+        "application",
+        "journal",
+        "domain",
+        "timeline"
+      ],
+      "verification": "python3 scripts/workflow_check.py --workflow idempotent-submit"
+    },
+    {
+      "id": "cancel",
+      "name": "cancel",
+      "entry": "POST /forge/v1/renders/{id}/cancel",
+      "success": "cancelled且下载拒绝",
+      "failure": "已完成成功任务不可取消",
+      "steps": [
+        "入口解码与领域事实读取",
+        "取消确认后的任务不能再提交可见成片",
+        "cancelled且下载拒绝"
+      ],
+      "module_ids": [
+        "http",
+        "application",
+        "journal",
+        "encoding",
+        "domain"
+      ],
+      "verification": "python3 scripts/workflow_check.py --workflow cancel"
+    },
+    {
+      "id": "retry",
+      "name": "retry",
+      "entry": "POST /forge/v1/renders/{id}/retry",
+      "success": "新尝试及原输入成片",
+      "failure": "非失败或超上限重试拒绝",
+      "steps": [
+        "入口解码与领域事实读取",
+        "重试沿用原冻结输入且尝试不超过三次",
+        "新尝试及原输入成片"
+      ],
+      "module_ids": [
+        "http",
+        "application",
+        "journal",
+        "encoding",
+        "inspection",
+        "objects"
+      ],
+      "verification": "python3 scripts/workflow_check.py --workflow retry"
+    },
+    {
+      "id": "artifact-verify",
+      "name": "artifact-verify",
+      "entry": "POST /forge/v1/renders/{id}/verify",
+      "success": "检验及可下载成片",
+      "failure": "摘要或字幕不一致拒绝",
+      "steps": [
+        "入口解码与领域事实读取",
+        "下载的媒体与字幕匹配已提交检验事实",
+        "检验及可下载成片"
+      ],
+      "module_ids": [
+        "http",
+        "application",
+        "inspection",
+        "media",
+        "objects",
+        "journal"
+      ],
+      "verification": "python3 scripts/workflow_check.py --workflow artifact-verify"
+    },
+    {
+      "id": "bundle",
+      "name": "bundle",
+      "entry": "GET /forge/v1/renders/{id}/bundle",
+      "success": "ZIP包含三个成员",
+      "failure": "检验失败前不发送成功包",
+      "steps": [
+        "入口解码与领域事实读取",
+        "包内媒体、字幕和快照来自同一成功尝试",
+        "ZIP包含三个成员"
+      ],
+      "module_ids": [
+        "http",
+        "application",
+        "inspection",
+        "objects",
+        "journal"
+      ],
+      "verification": "python3 scripts/workflow_check.py --workflow bundle"
+    },
+    {
+      "id": "restart-recover",
+      "name": "restart-recover",
+      "entry": "重启 forged 及 POST retry",
+      "success": "failed/interrupted及可显式重试",
+      "failure": "数据根已占用或状态不合法启动失败",
+      "steps": [
+        "入口解码与领域事实读取",
+        "中断的运行中尝试不会被误报为交付成功",
+        "failed/interrupted及可显式重试"
+      ],
+      "module_ids": [
+        "configuration",
+        "application",
+        "journal",
+        "domain",
+        "encoding"
+      ],
+      "verification": "python3 scripts/workflow_check.py --workflow restart-recover"
+    },
+    {
+      "id": "retire-source",
+      "name": "retire-source",
+      "entry": "DELETE /forge/v1/sources/{id}",
+      "success": "无引用素材退休且对象保守保留",
+      "failure": "任何有效引用返回409",
+      "steps": [
+        "入口解码与领域事实读取",
+        "所有历史剪辑、字幕及冻结任务的引用保持有效",
+        "无引用素材退休且对象保守保留"
+      ],
+      "module_ids": [
+        "http",
+        "application",
+        "domain",
+        "journal",
+        "objects"
+      ],
+      "verification": "python3 scripts/workflow_check.py --workflow retire-source"
+    },
+    {
+      "id": "events",
+      "name": "events",
+      "entry": "GET /forge/v1/events?after=N",
+      "success": "最多200条严格后继事件",
+      "failure": "非法游标返回400",
+      "steps": [
+        "入口解码与领域事实读取",
+        "状态变化与对应解释事件同次保存且游标单调",
+        "最多200条严格后继事件"
+      ],
+      "module_ids": [
+        "http",
+        "application",
+        "domain",
+        "journal"
+      ],
+      "verification": "python3 scripts/workflow_check.py --workflow events"
+    }
+  ],
+  "complexity": {
+    "mechanisms": [
+      "state_machine",
+      "resource_lifecycle",
+      "error_propagation",
+      "concurrency",
+      "versioning_audit",
+      "recovery_rollback",
+      "export_freeze",
+      "time_semantics",
+      "capacity",
+      "idempotency",
+      "policy_rules",
+      "lineage",
+      "snapshot_consistency"
+    ],
+    "evidence": {
+      "concurrency": "internal/service/worker.go:claim, completeLocked",
+      "recovery_rollback": "internal/journal/recovery.go:Recover",
+      "time_semantics": "internal/timeline/plan.go:Build; internal/caption/map.go:Map",
+      "idempotency": "internal/service/submit.go:Submit",
+      "snapshot_consistency": "internal/service/submit.go:Submit; internal/journal/store.go:Update"
+    }
+  }
+}

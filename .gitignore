@@ -1,0 +1,4 @@
+/var/
+/bin/
+*.log
+.DS_Store

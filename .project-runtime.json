@@ -1,0 +1,106 @@
+{
+  "language": "Go",
+  "project_shape": "backend",
+  "source_extensions": [
+    ".go"
+  ],
+  "build_command": "go build -trimpath -o bin/forged ./cmd/forged",
+  "testing": "deferred",
+  "runtime_dependencies": [
+    "Go >= 1.24",
+    "FFmpeg with libx264, aac, loudnorm, showwavespic, tile",
+    "ffprobe"
+  ],
+  "workflow_checks": [
+    {
+      "workflow_id": "ingest",
+      "command": "python3 scripts/workflow_check.py --workflow ingest",
+      "timeout_seconds": 120
+    },
+    {
+      "workflow_id": "recipe-version",
+      "command": "python3 scripts/workflow_check.py --workflow recipe-version",
+      "timeout_seconds": 120
+    },
+    {
+      "workflow_id": "sheet-version",
+      "command": "python3 scripts/workflow_check.py --workflow sheet-version",
+      "timeout_seconds": 120
+    },
+    {
+      "workflow_id": "preview",
+      "command": "python3 scripts/workflow_check.py --workflow preview",
+      "timeout_seconds": 120
+    },
+    {
+      "workflow_id": "captions",
+      "command": "python3 scripts/workflow_check.py --workflow captions",
+      "timeout_seconds": 120
+    },
+    {
+      "workflow_id": "loudness",
+      "command": "python3 scripts/workflow_check.py --workflow loudness",
+      "timeout_seconds": 120
+    },
+    {
+      "workflow_id": "storyboard",
+      "command": "python3 scripts/workflow_check.py --workflow storyboard",
+      "timeout_seconds": 120
+    },
+    {
+      "workflow_id": "waveform",
+      "command": "python3 scripts/workflow_check.py --workflow waveform",
+      "timeout_seconds": 120
+    },
+    {
+      "workflow_id": "mp4-render",
+      "command": "python3 scripts/workflow_check.py --workflow mp4-render",
+      "timeout_seconds": 120
+    },
+    {
+      "workflow_id": "wav-render",
+      "command": "python3 scripts/workflow_check.py --workflow wav-render",
+      "timeout_seconds": 120
+    },
+    {
+      "workflow_id": "idempotent-submit",
+      "command": "python3 scripts/workflow_check.py --workflow idempotent-submit",
+      "timeout_seconds": 120
+    },
+    {
+      "workflow_id": "cancel",
+      "command": "python3 scripts/workflow_check.py --workflow cancel",
+      "timeout_seconds": 120
+    },
+    {
+      "workflow_id": "retry",
+      "command": "python3 scripts/workflow_check.py --workflow retry",
+      "timeout_seconds": 120
+    },
+    {
+      "workflow_id": "artifact-verify",
+      "command": "python3 scripts/workflow_check.py --workflow artifact-verify",
+      "timeout_seconds": 120
+    },
+    {
+      "workflow_id": "bundle",
+      "command": "python3 scripts/workflow_check.py --workflow bundle",
+      "timeout_seconds": 120
+    },
+    {
+      "workflow_id": "restart-recover",
+      "command": "python3 scripts/workflow_check.py --workflow restart-recover",
+      "timeout_seconds": 120
+    },
+    {
+      "workflow_id": "retire-source",
+      "command": "python3 scripts/workflow_check.py --workflow retire-source",
+      "timeout_seconds": 120
+    },
+    {
+      "workflow_id": "events",
+      "command": "python3 scripts/workflow_check.py --workflow events",
+      "timeout_seconds": 120
+    }
+  ]
+}
